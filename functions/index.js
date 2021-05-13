@@ -5,154 +5,187 @@ const fetch = require("node-fetch");
 const { URLSearchParams } = require("url");
 
 // The Firebase Admin SDK to access Firestore.
-const admin = require("firebase-admin");
-admin.initializeApp();
+const firebase = require("firebase-admin");
 
-exports.recordOrder = functions.https.onRequest(async (req, res) => {
-  return cors()(req, res, () => {
-    CLIENT_ID = functions.config().twitch.client_id;
-    CLIENT_SECRET = functions.config().twitch.client_secret;
+var config = {
+  apiKey: "apiKey", // what is this
+  authDomain: "lonelyraids.firebaseapp.com",
+  databaseURL: "https://lonelyraids-default-rtdb.firebaseio.com/",
+  storageBucket: "bucket.appspot.com", // what is this
+};
 
-    MAX_VIEWERS = 0; // number of viewers to be considered for inclusion
-    REQUEST_LIMIT = 1500; // number of API requests to stop at before starting a new search
-    MINIMUM_STREAMS_TO_GET = 50; // if REQUEST_LIMIT streams doesn't capture at least this many zero-
-    // viewer streams, keep going
-    SECONDS_BEFORE_RECORD_EXPIRATION = 180; // how many seconds a stream should stay in redis
+firebase.initializeApp(config);
 
-    // find and add streams to db
-    populate_streamers();
+// Get a reference to the database service
+var db = firebase.database();
 
+const MAX_VIEWERS = 5; // number of viewers to be considered for inclusion
+const REQUEST_LIMIT = 1500; // number of API requests to stop at before starting a new search
 
-    
-    // Grab the order data (may be in req.query...)
-    const orderData = req.body;
-    // Push the new message into Firestore using the Firebase Admin SDK.
-    const writeResult = admin
-      .firestore()
-      .collection("orders")
-      .add({
-        orderData: {
-          ...orderData,
-          created: admin.firestore.Timestamp.now(),
-        },
-      });
-    // Send back a message that we've successfully written the message
-    res.json({ result: `Order with ID: ${writeResult} added.` });
+function writeStreamData(streamId) {
+  db.ref("currentRaid").set(
+    {
+      id: streamId,
+      added: firebase.firestore.Timestamp.now(),
+    },
+    (error) => {
+      if (error) {
+        console.error(error);
+        return false;
+      } else {
+        return true;
+      }
+    }
+  );
+}
+
+async function readStreamData() {
+  let snapshot = await db.ref("currentRaid").get();
+  if (snapshot.exists()) {
+    return snapshot.val();
+  } else {
+    console.log("No data available");
+    return null;
+  }
+}
+
+exports.fetchStream = functions.https.onRequest(async (req, res) => {
+  return cors()(req, res, async () => {
+    const CLIENT_ID = functions.config().twitch.client_id;
+    const CLIENT_SECRET = functions.config().twitch.client_secret;
+
+    var streamId = null;
+    // read the current stream in the database and check how long it's been there
+    const currentStream = await readStreamData();
+    let secondsSince =
+      firebase.firestore.Timestamp.now()._seconds -
+      currentStream.added._seconds;
+
+    var raidJoined = false;
+    if (secondsSince > 120) {
+      // if the stream is older than a certain time, find a new one
+      streamId = await populate_streamers(CLIENT_ID, CLIENT_SECRET);
+      writeStreamData(streamId);
+      console.log(`Raid started! Stream with ID: ${streamId} added to db`);
+    } else {
+      // else, serve the saved one
+      streamId = currentStream.id;
+      raidJoined = true;
+    }
+
+    res.json({ status: 200, streamId: streamId, raidJoined: raidJoined });
   });
 });
 
+async function populate_streamers(client_id, client_secret) {
+  var requests_sent = 1;
+  var streams_grabbed = 0;
+  var min_viewcount = 9999;
 
-function populate_streamers(client_id, client_secret) {
-  token = get_bearer_token(client_id, client_secret);
+  const token = await get_bearer_token(client_id, client_secret);
 
   if (!token) {
     console.log("There's no token! Halting.");
     return;
   }
 
-  requests_sent = 1;
-  streams_grabbed = 0;
-
   // eat page after page of API results until we hit our request limit
-  stream_list = get_stream_list_response(client_id, token);
-  while (
-    requests_sent <= REQUEST_LIMIT ||
-    streams_grabbed < MINIMUM_STREAMS_TO_GET
-  ) {
-    stream_list_data = stream_list.json();
+  var [stream_list, headers] = await get_stream_list_response(client_id, token);
+  var streamId = null;
+  while (requests_sent <= REQUEST_LIMIT) {
     requests_sent += 1;
 
-    // filter out streams with our desired count and inject into redis
-    streams_found = stream_list_data["data"].filter(
-      (stream) => stream["viewer_count"] <= MAX_VIEWERS
-    );
-
-    streams_found.forEach((stream) => {
+    var stream_list_data = stream_list.data;
+    stream_list_data.forEach((stream) => {
       streams_grabbed += 1;
-      // add stream to db
-      main_redis.setex(
-        json.dumps(stream),
-        SECONDS_BEFORE_RECORD_EXPIRATION,
-        time.time()
-      );
+      min_viewcount =
+        min_viewcount < stream.viewer_count
+          ? min_viewcount
+          : stream.viewer_count;
+      if (min_viewcount <= 5) {
+        streamId = stream.id;
+      }
     });
 
-    // report on what we inserted
-    if (streams_found.length > 0) {
-      logging.debug(`Inserted ${len(streams_found)} streams`);
+    // if we've found it, return it
+    if (streamId) {
+      return streamId;
     }
 
     // sleep on rate limit token utilization
-    rate_limit_usage = round(
+    rate_limit_usage = Math.round(
       (1 -
-        int(stream_list.headers["Ratelimit-Remaining"]) /
-          int(stream_list.headers["Ratelimit-Limit"])) *
+        parseInt(headers.get("Ratelimit-Remaining")) /
+          parseInt(headers.get("Ratelimit-Limit"))) *
         100
     );
+
     if (rate_limit_usage > 60) {
-      logging.warning(
+      console.log(
         `Rate limiting is at ${rate_limit_usage}% utilized; sleeping for 30s`
       );
-      time.sleep(30);
+      await sleep(5000); // sleep for 5
     }
 
     // drop a status every now and again
     if (requests_sent % 10 == 0) {
       console.log(
-        `${requests_sent} requests sent (${streams_grabbed} streams found); ``${stream_list.headers["Ratelimit-Remaining"]} of ${stream_list.headers["Ratelimit-Limit"]} ``API tokens remaining (${rate_limit_usage}% utilized)`
+        `${requests_sent} requests sent (${streams_grabbed} streams found) (${min_viewcount} lowest viewcount); ${headers.get(
+          "Ratelimit-Remaining"
+        )} of ${headers.get(
+          "Ratelimit-Limit"
+        )} API tokens remaining (${rate_limit_usage}% utilized)`
       );
-      // set stats db
-      //   stats_redis.set(
-      //     "stats",
-      //     json.dumps({
-      //       ratelimit_remaining: stream_list.headers["Ratelimit-Remaining"],
-      //       ratelimit_limit: stream_list.headers["Ratelimit-Limit"],
-      //       time_of_ratelimit: time.time(),
-      //     })
-      //   );
     }
     // aaaaand do it again
     try {
-      pagination_offset = stream_list_data["pagination"]["cursor"];
+      pagination_offset = stream_list["pagination"]["cursor"];
     } catch (KeyError) {
       // we hit the end of the list; no more keys
       console.log("Hit end of search results");
       break;
     }
 
-    stream_list = get_stream_list_response(client_id, token, pagination_offset);
+    [stream_list, headers] = await get_stream_list_response(
+      client_id,
+      token,
+      pagination_offset
+    );
   }
 }
-function get_bearer_token(client_id, secret) {
-  payload = {
+
+async function get_bearer_token(client_id, secret) {
+  const payload = {
     client_id: client_id,
     client_secret: secret,
     grant_type: "client_credentials",
   };
 
-  fetch("https://id.twitch.tv/oauth2/token", {
+  let response = await fetch("https://id.twitch.tv/oauth2/token", {
     method: "POST",
     body: JSON.stringify(payload),
     headers: { "Content-Type": "application/json" },
-  })
-    .then((res) => res.json())
-    .then((json) => console.log(json));
+  });
+  let token_response = await response.json();
 
   try {
     console.log(
-      `Recieved ${token_response.json()["access_token"]}; expires in ${
-        token_response.json()["expires_in"]
-      }s`
+      `Recieved ${token_response["access_token"]}; expires in ${token_response["expires_in"]}s`
     );
-    return token_response.json()["access_token"];
+    return token_response["access_token"];
   } catch (KeyError) {
     console.log(`Didn't find access token. Got '${token_response.text}'`);
-    return None;
+    console.log(KeyError);
+    return null;
   }
 }
 
-function get_stream_list_response(client_id, token, pagination_offset = null) {
-  headers = { "client-id": client_id, Authorization: `'Bearer ${token}` };
+async function get_stream_list_response(
+  client_id,
+  token,
+  pagination_offset = null
+) {
+  const headers = { "client-id": client_id, Authorization: `Bearer ${token}` };
 
   const params = new URLSearchParams();
   params.append("first", 100);
@@ -161,12 +194,19 @@ function get_stream_list_response(client_id, token, pagination_offset = null) {
   if (pagination_offset) {
     params.append("after", pagination_offset);
   }
+  const url = new URL("https://api.twitch.tv/helix/streams");
+  url.search = new URLSearchParams(params);
 
-  stream_list = fetch("https://api.twitch.tv/helix/streams", {
-    body: params,
+  let response = await fetch(url, {
     headers: headers,
   });
+  let response_headers = response.headers;
+  let json = await response.json();
 
-  return stream_list;
+  if (!json.error) {
+    return [json, response_headers];
+  } else {
+    console.log(`Error:  ${JSON.stringify(json)}`);
+    return [null, null];
+  }
 }
-
