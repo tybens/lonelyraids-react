@@ -7,7 +7,7 @@ const { URLSearchParams } = require("url");
 // The Firebase Admin SDK to access Firestore.
 const firebase = require("firebase-admin");
 
-var config = {
+const config = {
   apiKey: "apiKey", // what is this
   authDomain: "lonelyraids.firebaseapp.com",
   databaseURL: "https://lonelyraids-default-rtdb.firebaseio.com/",
@@ -17,11 +17,12 @@ var config = {
 firebase.initializeApp(config);
 
 // Get a reference to the database service
-var db = firebase.database();
+const db = firebase.database();
 
 const MAX_VIEWERS = 5; // number of viewers to be considered for inclusion
 const REQUEST_LIMIT = 1500; // number of API requests to stop at before starting a new search
 
+// writes stream id data to database
 function writeStreamData(streamId) {
   db.ref("currentRaid").set(
     {
@@ -39,6 +40,7 @@ function writeStreamData(streamId) {
   );
 }
 
+// reads database for the single currentStream
 async function readStreamData() {
   let snapshot = await db.ref("currentRaid").get();
   if (snapshot.exists()) {
@@ -49,19 +51,20 @@ async function readStreamData() {
   }
 }
 
+// endpoint containing logic for serving a raid to a user
 exports.fetchStream = functions.https.onRequest(async (req, res) => {
   return cors()(req, res, async () => {
     const CLIENT_ID = functions.config().twitch.client_id;
     const CLIENT_SECRET = functions.config().twitch.client_secret;
 
-    var streamId = null;
+    let streamId = null;
     // read the current stream in the database and check how long it's been there
     const currentStream = await readStreamData();
-    let secondsSince =
+    const secondsSince =
       firebase.firestore.Timestamp.now()._seconds -
       currentStream.added._seconds;
 
-    var raidJoined = false;
+    let raidJoined = false;
     if (secondsSince > 120) {
       // if the stream is older than a certain time, find a new one
       streamId = await populate_streamers(CLIENT_ID, CLIENT_SECRET);
@@ -77,10 +80,11 @@ exports.fetchStream = functions.https.onRequest(async (req, res) => {
   });
 });
 
+// returns a streamId of the desired view count
 async function populate_streamers(client_id, client_secret) {
-  var requests_sent = 1;
-  var streams_grabbed = 0;
-  var min_viewcount = 9999;
+  let requests_sent = 1;
+  let streams_grabbed = 0;
+  let min_viewcount = 9999;
 
   const token = await get_bearer_token(client_id, client_secret);
 
@@ -90,12 +94,12 @@ async function populate_streamers(client_id, client_secret) {
   }
 
   // eat page after page of API results until we hit our request limit
-  var [stream_list, headers] = await get_stream_list_response(client_id, token);
-  var streamId = null;
+  let [stream_list, headers] = await get_stream_list_response(client_id, token);
+  let streamId = null;
   while (requests_sent <= REQUEST_LIMIT) {
     requests_sent += 1;
 
-    var stream_list_data = stream_list.data;
+    let stream_list_data = stream_list.data;
     stream_list_data.forEach((stream) => {
       streams_grabbed += 1;
       min_viewcount =
@@ -113,7 +117,7 @@ async function populate_streamers(client_id, client_secret) {
     }
 
     // sleep on rate limit token utilization
-    rate_limit_usage = Math.round(
+    let rate_limit_usage = Math.round(
       (1 -
         parseInt(headers.get("Ratelimit-Remaining")) /
           parseInt(headers.get("Ratelimit-Limit"))) *
@@ -124,11 +128,11 @@ async function populate_streamers(client_id, client_secret) {
       console.log(
         `Rate limiting is at ${rate_limit_usage}% utilized; sleeping for 30s`
       );
-      await sleep(5000); // sleep for 5
+      // await sleep(5000); // sleep for 5
     }
 
     // drop a status every now and again
-    if (requests_sent % 10 == 0) {
+    if (requests_sent % 10 === 0) {
       console.log(
         `${requests_sent} requests sent (${streams_grabbed} streams found) (${min_viewcount} lowest viewcount); ${headers.get(
           "Ratelimit-Remaining"
@@ -138,6 +142,7 @@ async function populate_streamers(client_id, client_secret) {
       );
     }
     // aaaaand do it again
+    let pagination_offset = null;
     try {
       pagination_offset = stream_list["pagination"]["cursor"];
     } catch (KeyError) {
@@ -154,6 +159,7 @@ async function populate_streamers(client_id, client_secret) {
   }
 }
 
+// gets twitch api token
 async function get_bearer_token(client_id, secret) {
   const payload = {
     client_id: client_id,
@@ -180,6 +186,7 @@ async function get_bearer_token(client_id, secret) {
   }
 }
 
+// gets list of streams using twitch api
 async function get_stream_list_response(
   client_id,
   token,
