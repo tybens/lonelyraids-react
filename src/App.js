@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { TwitchEmbed } from "react-twitch-embed";
 import {
   Button,
@@ -29,6 +29,7 @@ function App() {
           setRaid("");
         }
       });
+      // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleClick = () => {
