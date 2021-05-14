@@ -8,14 +8,18 @@ const location = require("location");
 // The Firebase Admin SDK to access Firestore.
 const firebase = require("firebase-admin");
 
-const config = {
-  apiKey: "apiKey", // what is this
-  authDomain: "lonelyraids.firebaseapp.com",
-  databaseURL: "https://lonelyraids-default-rtdb.firebaseio.com/",
-  storageBucket: "bucket.appspot.com", // what is this
-};
+var firebaseConfig = {
+    apiKey: "AIzaSyCiOkZCnzXGhbFA7yZ_P-FqaGeF8Mdq2Zc",
+    authDomain: "lonelyraids.firebaseapp.com",
+    databaseURL: "https://lonelyraids-default-rtdb.firebaseio.com",
+    projectId: "lonelyraids",
+    storageBucket: "lonelyraids.appspot.com",
+    messagingSenderId: "40364542390",
+    appId: "1:40364542390:web:106ebdf3a3d623fa901917",
+    measurementId: "G-787Y0K3GHF"
+  };
 
-firebase.initializeApp(config);
+firebase.initializeApp(firebaseConfig);
 
 // Get a reference to the database service
 const db = firebase.database();
@@ -24,7 +28,7 @@ if (location.hostname === "localhost") {
   db.useEmulator("localhost", 9000);
 }
 
-const MAX_VIEWERS = 1000; // number of viewers to be considered for inclusion
+const MAX_VIEWERS = 5; // number of viewers to be considered for inclusion
 const REQUEST_LIMIT = 1500; // number of API requests to stop at before starting a new search
 
 // writes stream id data to database
