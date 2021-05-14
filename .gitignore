@@ -18,6 +18,7 @@
 .env.test.local
 .env.production.local
 firebase-debug.log
+database-debug.log
 firestore-debug.log
 ui-debug.log
 

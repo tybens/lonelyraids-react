@@ -3,6 +3,7 @@ const functions = require("firebase-functions");
 const cors = require("cors");
 const fetch = require("node-fetch");
 const { URLSearchParams } = require("url");
+const location = require("location");
 
 // The Firebase Admin SDK to access Firestore.
 const firebase = require("firebase-admin");
@@ -18,15 +19,19 @@ firebase.initializeApp(config);
 
 // Get a reference to the database service
 const db = firebase.database();
+if (location.hostname === "localhost") {
+  // Point to the RTDB emulator running on localhost.
+  db.useEmulator("localhost", 9000);
+}
 
-const MAX_VIEWERS = 5; // number of viewers to be considered for inclusion
+const MAX_VIEWERS = 1000; // number of viewers to be considered for inclusion
 const REQUEST_LIMIT = 1500; // number of API requests to stop at before starting a new search
 
 // writes stream id data to database
-function writeStreamData(streamId) {
+function writeStreamData(streamName) {
   db.ref("currentRaid").set(
     {
-      id: streamId,
+      streamName: streamName,
       added: firebase.firestore.Timestamp.now(),
     },
     (error) => {
@@ -57,30 +62,36 @@ exports.fetchStream = functions.https.onRequest(async (req, res) => {
     const CLIENT_ID = functions.config().twitch.client_id;
     const CLIENT_SECRET = functions.config().twitch.client_secret;
 
-    let streamId = null;
+    let streamName = null;
     // read the current stream in the database and check how long it's been there
     const currentStream = await readStreamData();
-    const secondsSince =
-      firebase.firestore.Timestamp.now()._seconds -
-      currentStream.added._seconds;
+    let secondsSince = 9999;
+    try {
+      secondsSince =
+        firebase.firestore.Timestamp.now()._seconds -
+        currentStream.added._seconds;
+    } catch (error) {
+      // database was empty, just fill it with a new one.
+    }
 
     let raidJoined = false;
     if (secondsSince > 120) {
       // if the stream is older than a certain time, find a new one
-      streamId = await populate_streamers(CLIENT_ID, CLIENT_SECRET);
-      writeStreamData(streamId);
-      console.log(`Raid started! Stream with ID: ${streamId} added to db`);
+      streamName = await populate_streamers(CLIENT_ID, CLIENT_SECRET);
+      writeStreamData(streamName);
+      console.log(`Raid started! Stream with username: ${streamName} added to db`);
     } else {
       // else, serve the saved one
-      streamId = currentStream.id;
+      streamName = currentStream.streamName;
       raidJoined = true;
     }
 
-    res.json({ status: 200, streamId: streamId, raidJoined: raidJoined });
+    console.log(`Stream name found: ${streamName}`)
+    res.json({ status: 200, streamName: streamName, raidJoined: raidJoined });
   });
 });
 
-// returns a streamId of the desired view count
+// returns a streamName of the desired view count
 async function populate_streamers(client_id, client_secret) {
   let requests_sent = 1;
   let streams_grabbed = 0;
@@ -95,7 +106,7 @@ async function populate_streamers(client_id, client_secret) {
 
   // eat page after page of API results until we hit our request limit
   let [stream_list, headers] = await get_stream_list_response(client_id, token);
-  let streamId = null;
+  let streamName = null;
   while (requests_sent <= REQUEST_LIMIT) {
     requests_sent += 1;
 
@@ -106,14 +117,14 @@ async function populate_streamers(client_id, client_secret) {
         min_viewcount < stream.viewer_count
           ? min_viewcount
           : stream.viewer_count;
-      if (min_viewcount <= 5) {
-        streamId = stream.id;
+      if (min_viewcount <= MAX_VIEWERS) {
+        streamName = stream;
       }
     });
 
     // if we've found it, return it
-    if (streamId) {
-      return streamId;
+    if (streamName) {
+      return streamName.user_name;
     }
 
     // sleep on rate limit token utilization
