@@ -72,18 +72,20 @@ exports.fetchStream = functions.https.onRequest(async (req, res) => {
     // read the current stream in the database and check how long it's been there
     const currentStream = await readStreamData();
     let secondsSince = 9999;
+    let pagination_offset = null;
     try {
       secondsSince =
         firebase.firestore.Timestamp.now()._seconds -
         currentStream.added._seconds;
+      pagination_offset = currentStream.pagination_offset;
     } catch (error) {
       // database was empty, just fill it with a new one.
     }
 
     let raidJoined = false;
-    if (secondsSince > 120) {
+    if (secondsSince > 60) {
       // if the stream is older than a certain time, find a new one (starting at the pagination offset ?)
-      data = await populate_streamers(CLIENT_ID, CLIENT_SECRET, currentStream.pagination_offset);
+      data = await populate_streamers(CLIENT_ID, CLIENT_SECRET, pagination_offset );
       streamName = data.user
       writeStreamData(streamName, data.pagination_offset);
       console.log(

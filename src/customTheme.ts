@@ -25,6 +25,12 @@ const theme = createMuiTheme({
       },
     },
 
+    MuiCircularProgress: {
+      colorPrimary: {
+        color: "black",
+      },
+    },
+
     MuiButton: {
         containedSizeLarge: {
             fontSize: "1.5rem",

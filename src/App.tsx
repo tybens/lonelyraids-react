@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { TwitchEmbed } from "react-twitch-embed";
 import {
   Button,
   Grid,
@@ -8,12 +7,13 @@ import {
   Drawer,
 } from "@material-ui/core";
 import useStyles from "./styles";
-
+const TwitchEmbed = require("react-twitch-embed").TwitchEmbed
 function App() {
   const [raid, setRaid] = useState("");
   const [buttonClicked, setButtonClicked] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(120);
+  // const [timeLeft, setTimeLeft] = useState(60);
+  // const ReactTwitchEmbed = await import("react-twitch-embed");
 
   const classes = useStyles();
   const functionUrl = window.location.href.includes("localhost")
@@ -30,10 +30,10 @@ function App() {
             "found stream: ",
             json.streamName,
             " with seconds since: ",
-            120 - json.secondsSince
+            60 - json.secondsSince
           );
           // setCounting(true);
-          setTimeLeft(120 - json.secondsSince);
+          // setTimeLeft(60 - json.secondsSince);
           setRaid(json.streamName);
         } else {
           console.log("error jsonstreamname:", json.streamName);
@@ -46,13 +46,13 @@ function App() {
   const handleClick = () => {
     // just toggle for now
     setLoading(true);
-    setButtonClicked(true);
     fetch(functionUrl)
       .then((res) => res.json())
       .then((json) => {
         if (json.streamName) {
+          setLoading(false)
           setRaid(json.streamName);
-          setLoading(false);
+          setButtonClicked(true);
         } else {
           console.log("error jsonstreamname:", json.streamName);
           setRaid("");
@@ -60,12 +60,13 @@ function App() {
       });
   };
 
-  const RaidButton = () => (
+  const RaidButton = ({ fullWidth = true }: any) => (
     <>
       <Button
         variant="contained"
         size={buttonClicked ? "medium" : "large"}
         color="primary"
+        fullWidth={fullWidth}
         onClick={handleClick}
       >
         {loading ? (
@@ -74,7 +75,7 @@ function App() {
           "Join or start raid!"
         )}
       </Button>
-      <Drawer open={loading}>
+      <Drawer open={false}>
         <Typography variant="body2" color="primary">
           {"If starting a new raid, it could take >10s to find."}
         </Typography>
@@ -100,20 +101,38 @@ function App() {
           justify={!buttonClicked ? "center" : "space-between"}
           className={classes.headerInner}
         >
-          <Typography variant="h1" color="primary">Lonely Raids</Typography>
-          {raid !== "" && buttonClicked && <RaidButton />}
+          <Grid item sm={9} xs={12}>
+            <Typography variant="h1" color="primary">
+              Lonely Raids
+            </Typography>
+            <Typography variant="body2" color="primary">
+              collectively joining streams with zero viewers
+            </Typography>
+          </Grid>
+          <Grid item xs>
+            {raid !== "" && buttonClicked && <RaidButton />}
+          </Grid>
         </Grid>
       </Grid>
-      <Grid item xs={12} container justify="center" alignItems="center">
+      <Grid
+        item
+        xs={12}
+        container
+        justify="center"
+        alignItems="center"
+        className={classes.embed}
+      >
         {raid !== "" && buttonClicked ? (
           <TwitchEmbed
+            width="100%"
+            height="100%"
             id="this-id"
             channel={raid}
             theme="dark"
             onVideoPause={() => console.log(":(")}
           />
         ) : (
-          <RaidButton />
+          <RaidButton fullWidth={false} />
         )}
       </Grid>
     </Grid>
