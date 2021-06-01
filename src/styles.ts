@@ -6,8 +6,8 @@ const styles = makeStyles(() => ({
     overflowX: "hidden",
   },
   header: {
-    background: "#f1f3f5",
-    padding: "20px 50px",
+    background: "transparent",
+    padding: "30px 50px",
     minHeight: "100px",
     position: "fixed",
     top: 0,

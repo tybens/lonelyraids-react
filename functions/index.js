@@ -9,16 +9,17 @@ const location = require("location");
 const firebase = require("firebase-admin");
 
 var firebaseConfig = {
-    apiKey: "AIzaSyCiOkZCnzXGhbFA7yZ_P-FqaGeF8Mdq2Zc",
-    authDomain: "lonelyraids.firebaseapp.com",
-    databaseURL: "https://lonelyraids-default-rtdb.firebaseio.com",
-    projectId: "lonelyraids",
-    storageBucket: "lonelyraids.appspot.com",
-    messagingSenderId: "40364542390",
-    appId: "1:40364542390:web:106ebdf3a3d623fa901917",
-    measurementId: "G-787Y0K3GHF"
-  };
+  apiKey: "AIzaSyCiOkZCnzXGhbFA7yZ_P-FqaGeF8Mdq2Zc",
+  authDomain: "lonelyraids.firebaseapp.com",
+  databaseURL: "https://lonelyraids-default-rtdb.firebaseio.com",
+  projectId: "lonelyraids",
+  storageBucket: "lonelyraids.appspot.com",
+  messagingSenderId: "40364542390",
+  appId: "1:40364542390:web:106ebdf3a3d623fa901917",
+  measurementId: "G-787Y0K3GHF",
+};
 
+// Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 
 // Get a reference to the database service
@@ -28,15 +29,16 @@ if (location.hostname === "localhost") {
   db.useEmulator("localhost", 9000);
 }
 
-const MAX_VIEWERS = 5; // number of viewers to be considered for inclusion
+const MAX_VIEWERS = 2; // number of viewers to be considered for inclusion
 const REQUEST_LIMIT = 1500; // number of API requests to stop at before starting a new search
 
 // writes stream id data to database
-function writeStreamData(streamName) {
+function writeStreamData(streamName, pagination_offset) {
   db.ref("currentRaid").set(
     {
       streamName: streamName,
       added: firebase.firestore.Timestamp.now(),
+      pagination_offset: pagination_offset,
     },
     (error) => {
       if (error) {
@@ -80,23 +82,27 @@ exports.fetchStream = functions.https.onRequest(async (req, res) => {
 
     let raidJoined = false;
     if (secondsSince > 120) {
-      // if the stream is older than a certain time, find a new one
-      streamName = await populate_streamers(CLIENT_ID, CLIENT_SECRET);
-      writeStreamData(streamName);
-      console.log(`Raid started! Stream with username: ${streamName} added to db`);
+      // if the stream is older than a certain time, find a new one (starting at the pagination offset ?)
+      data = await populate_streamers(CLIENT_ID, CLIENT_SECRET, currentStream.pagination_offset);
+      streamName = data.user
+      writeStreamData(streamName, data.pagination_offset);
+      console.log(
+        `Raid started! Stream with username: ${streamName} added to db`
+      );
+      secondsSince = 0
     } else {
       // else, serve the saved one
       streamName = currentStream.streamName;
       raidJoined = true;
     }
 
-    console.log(`Stream name found: ${streamName}`)
-    res.json({ status: 200, streamName: streamName, raidJoined: raidJoined });
+    console.log(`Stream name found: ${streamName}`);
+    res.json({ status: 200, streamName: streamName, raidJoined: raidJoined, secondsSince: secondsSince });
   });
 });
 
-// returns a streamName of the desired view count
-async function populate_streamers(client_id, client_secret) {
+// returns a { name: streamName, pagination_offset: pagination_offset} of the desired view count
+async function populate_streamers(client_id, client_secret, pagination_offset= null) {
   let requests_sent = 1;
   let streams_grabbed = 0;
   let min_viewcount = 9999;
@@ -109,7 +115,7 @@ async function populate_streamers(client_id, client_secret) {
   }
 
   // eat page after page of API results until we hit our request limit
-  let [stream_list, headers] = await get_stream_list_response(client_id, token);
+  let [stream_list, headers] = await get_stream_list_response(client_id, token, pagination_offset);
   let streamName = null;
   while (requests_sent <= REQUEST_LIMIT) {
     requests_sent += 1;
@@ -128,7 +134,7 @@ async function populate_streamers(client_id, client_secret) {
 
     // if we've found it, return it
     if (streamName) {
-      return streamName.user_name;
+      return {user: streamName.user_name, pagination_offset: pagination_offset};
     }
 
     // sleep on rate limit token utilization
@@ -157,7 +163,6 @@ async function populate_streamers(client_id, client_secret) {
       );
     }
     // aaaaand do it again
-    let pagination_offset = null;
     try {
       pagination_offset = stream_list["pagination"]["cursor"];
     } catch (KeyError) {
