@@ -1,35 +1,26 @@
-import React, { useEffect, useState } from 'react'
+import { Typography } from "@material-ui/core";
+import React, { useEffect } from "react";
 
-const Timer = ({onMount}: any) => {
-  const [timeLeft, setTimeLeft] = useState(120);
-  const [counting, setCounting] = useState(false);
-
+const Timer = ({ counting, timeLeft, setTimeLeft, setCounting }: any) => {
   useEffect(() => {
-    setCounting(true)
-    onMount([timeLeft, setTimeLeft, counting, setCounting])
+    let timer = setInterval(() => {
+      if (counting && timeLeft > 0) {
+        setTimeLeft(timeLeft - 1);
+      } else {
+        setCounting(false);
+      }
+    }, 1000);
 
-  }, [onMount, timeLeft])
- 
-    // start ticking on load (only counts down if seconds since)
-    useEffect(() => {
-      const timer = setTimeout(() => {
-        if (counting) {
-          setTimeLeft(timeLeft - 1);
-        }
-      }, 1000);
-      return () => clearTimeout(timer);
-    }, []);
-  
-  
-    if (timeLeft === 0) {
-      setCounting(false);
-    }
+    return () => clearInterval(timer);
+    // eslint-disable-next-line
+  }, [counting, timeLeft]);
 
-    return (
-        <div>
-            {timeLeft} seconds left
-        </div>
-    )
-}
+  return (
+    <Typography variant="body2" color="primary">
+      {timeLeft} seconds left in this raid
+      {timeLeft < 1 && "! Start a new one!"}
+    </Typography>
+  );
+};
 
-export default Timer
+export default Timer;

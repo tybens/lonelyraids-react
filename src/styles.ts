@@ -5,20 +5,6 @@ const styles = makeStyles((theme) => ({
     minHeight: "100vh",
     overflowX: "hidden",
   },
-  header: {
-    background: "transparent",
-    padding: "30px 50px",
-    minHeight: "100px",
-    position: "fixed",
-    top: 0,
-    [theme.breakpoints.down("sm")]: {
-      position: "relative",
-      padding: "0 20px",
-    },
-  },
-  headerInner: {
-    height: "100%",
-  },
 
   embed: {
     [theme.breakpoints.down("md")]: {
@@ -28,11 +14,6 @@ const styles = makeStyles((theme) => ({
     height: "75vh",
   },
 
-  spinner: {
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-  },
 }));
 
 export default styles;
