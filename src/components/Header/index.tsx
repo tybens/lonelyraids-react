@@ -49,7 +49,7 @@ const Header = ({ buttonClicked, setRaid, raid, setButtonClicked }: any) => {
           setLoading(false);
           setRaid(json.streamName);
           setTimeLeft(60 - json.secondsSince);
-          setCounting(true)
+          setCounting(true);
           setButtonClicked(true);
         } else {
           console.log("error jsonstreamname:", json.streamName);
@@ -62,36 +62,36 @@ const Header = ({ buttonClicked, setRaid, raid, setButtonClicked }: any) => {
     <Grid
       item
       xs={12}
-      className={classNames(classes.header, !buttonClicked && classes.fullHeight)}
+      className={classNames(
+        classes.header,
+        !buttonClicked && classes.fullHeight
+      )}
       alignItems="flex-start"
-      container        
+      container
       justify={!buttonClicked ? "center" : "space-between"}
-
     >
-        <Grid item sm={9} xs={12}>
-          <Typography variant="h1" color="primary">
-            Lonely Raids
-          </Typography>
-          <Typography variant="body2" color="primary" gutterBottom>
-            collectively joining streams with low view counts
-          </Typography>
-          <Timer
-            timeLeft={timeLeft}
-            setTimeLeft={setTimeLeft}
-            setCounting={setCounting}
-            counting={counting}
-          />
-        </Grid>
-        <Grid item xs>
-          {raid !== "" && (
-            <RaidButton
-              fullWidth={false}
-              loading={loading}
-              handleClick={handleClick}
-              buttonClicked={buttonClicked}
-            />
-          )}
-        </Grid>
+      <Grid item sm={9} xs={12}>
+        <Typography variant="h1" color="primary">
+          Lonely Raids
+        </Typography>
+        <Typography variant="body2" color="primary" gutterBottom>
+          collectively joining streams with low view counts
+        </Typography>
+        <Timer
+          timeLeft={timeLeft}
+          setTimeLeft={setTimeLeft}
+          setCounting={setCounting}
+          counting={counting}
+        />
+      </Grid>
+      <Grid item xs>
+        <RaidButton
+          fullWidth={false}
+          loading={loading}
+          handleClick={handleClick}
+          buttonClicked={buttonClicked}
+        />
+      </Grid>
     </Grid>
   );
 };
