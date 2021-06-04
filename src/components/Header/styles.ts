@@ -12,6 +12,7 @@ const styles = makeStyles((theme) => ({
     [theme.breakpoints.down("sm")]: {
       position: "relative",
       padding: "0 20px",
+      minHeight: "30px"
     },
   },
   headerInner: {

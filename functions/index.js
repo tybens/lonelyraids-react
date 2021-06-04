@@ -24,10 +24,10 @@ firebase.initializeApp(firebaseConfig);
 
 // Get a reference to the database service
 const db = firebase.database();
-if (location.hostname === "localhost") {
+// if (location.hostname === "localhost") {
   // Point to the RTDB emulator running on localhost.
-  db.useEmulator("localhost", 9000);
-}
+  // db.useEmulator("localhost", 9000);
+// }
 
 const MAX_VIEWERS = 2; // number of viewers to be considered for inclusion
 const REQUEST_LIMIT = 1500; // number of API requests to stop at before starting a new search

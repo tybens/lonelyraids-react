@@ -12,7 +12,7 @@ const Header = ({ buttonClicked, setRaid, raid, setButtonClicked }: any) => {
   const [counting, setCounting] = useState(false);
 
   const functionUrl = window.location.href.includes("localhost")
-    ? "http://localhost:5001/lonelyraids/us-central/fetchStream"
+    ? "http://localhost:5001/lonelyraids/us-central1/fetchStream"
     : "https://us-central1-lonelyraids.cloudfunctions.net/fetchStream";
 
   // search for a stream when a user opens the site and start ticking
@@ -62,10 +62,7 @@ const Header = ({ buttonClicked, setRaid, raid, setButtonClicked }: any) => {
     <Grid
       item
       xs={12}
-      className={classNames(
-        classes.header,
-        !buttonClicked && classes.fullHeight
-      )}
+      className={classes.header}
       alignItems="flex-start"
       container
       justify={!buttonClicked ? "center" : "space-between"}

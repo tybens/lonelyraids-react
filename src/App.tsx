@@ -3,6 +3,7 @@ import { Grid } from "@material-ui/core";
 import useStyles from "./styles";
 import Header from "./components/Header";
 import { TwitchEmbed } from "react-twitch-embed";
+import Footer from "./components/Footer";
 
 function App() {
   const [raid, setRaid] = useState("");
@@ -39,6 +40,7 @@ function App() {
           />
         )}
       </Grid>
+      <Footer />
     </Grid>
   );
 }
