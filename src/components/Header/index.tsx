@@ -69,7 +69,7 @@ const Header = ({ buttonClicked, setRaid, raid, setButtonClicked }: any) => {
     >
       <Grid item sm={9} xs={12}>
         <Typography variant="h1" color="primary">
-          Lonely Raids
+          Lonelier Raids
         </Typography>
         <Typography variant="body2" color="primary" gutterBottom>
           collectively joining streams with low view counts
